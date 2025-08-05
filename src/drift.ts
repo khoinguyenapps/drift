@@ -19,13 +19,24 @@ dotenv.config();
 
 const PRIVATE_KEY = process.env.PRIVATE_KEY as string;
 
-export const getTokenAddress = (mintAddress: string, userPubKey: string): Promise<PublicKey> => {
-  return getAssociatedTokenAddress(new PublicKey(mintAddress), new PublicKey(userPubKey));
+export const getTokenAddress = (
+  mintAddress: string,
+  userPubKey: string
+): Promise<PublicKey> => {
+  return getAssociatedTokenAddress(
+    new PublicKey(mintAddress),
+    new PublicKey(userPubKey)
+  );
 };
 
-const getUserAccountPublicKey = async (driftClient: DriftClient, subAccountId: number) => {
+const getUserAccountPublicKey = async (
+  driftClient: DriftClient,
+  subAccountId: number
+) => {
   try {
-    const userAccountPublicKey = await driftClient.getUserAccountPublicKey(subAccountId);
+    const userAccountPublicKey = await driftClient.getUserAccountPublicKey(
+      subAccountId
+    );
     return userAccountPublicKey;
   } catch (error) {
     return null;
@@ -33,7 +44,9 @@ const getUserAccountPublicKey = async (driftClient: DriftClient, subAccountId: n
 };
 
 const getTokenInfo = async (symbol: string) => {
-  const tokenInfo = PerpMarkets["devnet"].find((market) => market.baseAssetSymbol === symbol);
+  const tokenInfo = PerpMarkets["devnet"].find(
+    (market) => market.baseAssetSymbol === symbol
+  );
   if (!tokenInfo) {
     throw new Error(`Token info for ${symbol} not found`);
   }
@@ -42,8 +55,14 @@ const getTokenInfo = async (symbol: string) => {
 
 const generateDelegateKeypair = () => {
   const newSolanaAccount = Keypair.generate();
-  console.log("Delegate account address: ", newSolanaAccount.publicKey.toBase58());
-  console.log("Delegate account secret: ", Buffer.from(newSolanaAccount.secretKey).toString("hex"));
+  console.log(
+    "Delegate account address: ",
+    newSolanaAccount.publicKey.toBase58()
+  );
+  console.log(
+    "Delegate account secret: ",
+    Buffer.from(newSolanaAccount.secretKey).toString("hex")
+  );
   return newSolanaAccount;
 };
 
@@ -65,7 +84,11 @@ const main = async () => {
   const wallet = new Wallet(loadKeypair(PRIVATE_KEY));
   console.log("wallet:", wallet.publicKey.toBase58());
 
-  const bulkAccountLoader = new BulkAccountLoader(connection, "confirmed", 1000);
+  const bulkAccountLoader = new BulkAccountLoader(
+    connection,
+    "confirmed",
+    1000
+  );
 
   // Init Drift client
   const driftClient = new DriftClient({
@@ -80,12 +103,17 @@ const main = async () => {
   await driftClient.subscribe();
 
   // Get the wallet balance
-  const lamportsBalance = await connection.getBalance(driftClient.wallet.publicKey);
+  const lamportsBalance = await connection.getBalance(
+    driftClient.wallet.publicKey
+  );
   console.log(`Wallet Balance: ${lamportsBalance / 1e9} SOL`);
 
   // Get the user account public key
   const subAccountId = 0;
-  const userAccountPublicKey = await getUserAccountPublicKey(driftClient, subAccountId);
+  const userAccountPublicKey = await getUserAccountPublicKey(
+    driftClient,
+    subAccountId
+  );
   let user;
 
   // Check if user account exists
@@ -101,13 +129,19 @@ const main = async () => {
     });
   } else {
     // User account does not exist, initialize it
-    const [txSig, userPublicKey] = await driftClient.initializeUserAccount(subAccountId);
-    console.log(`User Account Initialized with address: ${userPublicKey.toBase58()}`);
+    const [txSig, userPublicKey] = await driftClient.initializeUserAccount(
+      subAccountId
+    );
+    console.log(
+      `User Account Initialized with address: ${userPublicKey.toBase58()}`
+    );
 
     // Deposit 0.5 SOL into the user account
     const marketIndex = 1; // SOL, ex: 1 for SOL, 0 for USDC
     const amount = driftClient.convertToSpotPrecision(marketIndex, 0.5);
-    const associatedTokenAccount = await driftClient.getAssociatedTokenAccount(marketIndex);
+    const associatedTokenAccount = await driftClient.getAssociatedTokenAccount(
+      marketIndex
+    );
     await driftClient.deposit(amount, marketIndex, associatedTokenAccount);
 
     user = new User({
