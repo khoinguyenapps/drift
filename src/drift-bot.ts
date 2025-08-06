@@ -25,7 +25,7 @@ const BOT_CONFIG = {
   price: 165.35, // TODO: get price from API
   depositAmount: 0.5, // Deposit 0.5 SOL
 
-  useDelegate: false, // Toggle delegate functionality ON/OFF
+  useDelegate: true, // Toggle delegate functionality ON/OFF
   delegateTradingAccountId: 0, // Trading account ID for delegate
 
   network: "devnet", // "devnet" or "mainnet-beta"
@@ -53,7 +53,10 @@ const getBalance = async (connection: Connection, wallet: Wallet) => {
   return lamportsBalance;
 };
 
-const getTradingAccountBalance = async (driftClient: DriftClient, user: User) => {
+const getTradingAccountBalance = async (
+  driftClient: DriftClient,
+  user: User
+) => {
   try {
     console.log("Get trading account balance...");
     try {
@@ -118,57 +121,20 @@ const generateDelegateKeypair = () => {
   return newSolanaAccount;
 };
 
-const setupDelegate = async (
-  driftClient: DriftClient,
-  accountId: number
-) => {
+const setupDelegate = async (driftClient: DriftClient, accountId: number) => {
   try {
     console.log("Setting up delegate account...");
 
     // Generate new delegate keypair
     const delegateAccount = generateDelegateKeypair();
 
-    // Update user delegate
-    await driftClient.updateUserDelegate(
-      delegateAccount.publicKey,
-      accountId
-    );
-    console.log("✅ Delegate account updated successfully!");
+    // Set delegate for the user account
+    await driftClient.updateUserDelegate(delegateAccount.publicKey, accountId);
+    console.log("✅ Delegate account set successfully!");
 
     return delegateAccount;
   } catch (error) {
     console.error("❌ Failed to setup delegate:", error);
-    throw error;
-  }
-};
-
-const createDelegateClient = async (
-  connection: Connection,
-  delegateAccount: Keypair,
-  mainWallet: Wallet,
-  bulkAccountLoader: BulkAccountLoader
-) => {
-  try {
-    console.log("🔐 Creating delegate client...");
-
-    const delegateDriftClient = new DriftClient({
-      connection,
-      wallet: new Wallet(delegateAccount),
-      env: BOT_CONFIG.network as any,
-      accountSubscription: {
-        type: "polling",
-        accountLoader: bulkAccountLoader,
-      },
-      authority: mainWallet.publicKey, // Use main wallet as authority
-      includeDelegates: true, // Include delegate accounts
-    });
-
-    await delegateDriftClient.subscribe();
-    console.log("✅ Delegate client created and subscribed!");
-
-    return delegateDriftClient;
-  } catch (error) {
-    console.error("❌ Failed to create delegate client:", error);
     throw error;
   }
 };
@@ -182,7 +148,10 @@ const placeTrade = async (driftClient: DriftClient, user: User) => {
 
     // Check trading account balance
     console.log("🔍 Checking trading balance before trading...");
-    const tradingAccountBalance = await getTradingAccountBalance(driftClient, user);
+    const tradingAccountBalance = await getTradingAccountBalance(
+      driftClient,
+      user
+    );
 
     const requiredCollateral = BOT_CONFIG.orderSize * 2;
     if (!tradingAccountBalance || tradingAccountBalance < requiredCollateral) {
@@ -201,7 +170,10 @@ const placeTrade = async (driftClient: DriftClient, user: User) => {
         driftClient,
         user
       );
-      if (newTradingAccountBalance && newTradingAccountBalance < requiredCollateral) {
+      if (
+        newTradingAccountBalance &&
+        newTradingAccountBalance < requiredCollateral
+      ) {
         throw new Error(
           `Still insufficient balance in trading account after deposit`
         );
@@ -337,30 +309,21 @@ const main = async () => {
   console.log("👤 User account subscribed");
 
   // Setup delegate if enabled
-  let delegateAccount: Keypair | null = null;
-  let delegateDriftClient: DriftClient | null = null;
-
   if (BOT_CONFIG.useDelegate) {
     console.log("Delegate mode enabled...");
-    delegateAccount = await setupDelegate(
-      mainDriftClient,
-      BOT_CONFIG.delegateTradingAccountId
-    );
-    delegateDriftClient = await createDelegateClient(
-      connection,
-      delegateAccount,
-      mainWallet,
-      bulkAccountLoader
+    await setupDelegate(mainDriftClient, BOT_CONFIG.delegateTradingAccountId);
+
+    // Wait a bit for delegate setup to propagate
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+
+    console.log(
+      "👤 Delegate mode: Using main client with delegate authorization"
     );
   } else {
     console.log("👤 Direct trading mode (no delegate)");
   }
 
-  const tradingClient = BOT_CONFIG.useDelegate
-    ? delegateDriftClient!
-    : mainDriftClient;
-
-  await placeTrade(tradingClient, user);
+  await placeTrade(mainDriftClient, user);
 
   console.log("✅ Bot execution completed!");
 };
